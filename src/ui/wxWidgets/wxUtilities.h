@@ -15,6 +15,9 @@
 
 #include <wx/eventfilter.h>
 #include <wx/dataobj.h>
+#include <wx/panel.h>
+#include <wx/spinctrl.h>
+#include <wx/stream.h>
 
 #include "core/StringX.h"
 #include "core/PWSprefs.h"
@@ -314,10 +317,11 @@ private:
 
 #ifdef __WXGTK20__
 /* We need to add one more format to support DnD into Firefox, that wants
- "text/plain" ("text/plain;charset=utf-8")
+ "text/plain" and Firefox's clipboard with Wayland backend wants "text/plain;charset=utf-8",
+(X11 backend works fine with STRING/UTF8_STRING in clipboard)
  https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Recommended_Drag_Types
  https://hg.mozilla.org/mozilla-central/file/tip/widget/gtk/nsDragService.cpp
- [no need to use it with clipboard, Firefox works fine with STRING/UTF8_STRING in clipboard]
+ https://hg.mozilla.org/mozilla-central/file/tip/widget/gtk/nsClipboardWayland.cpp
  */
 
 class wxTextDataObjectEx : public wxTextDataObject {
@@ -326,13 +330,17 @@ public:
 
   virtual size_t GetFormatCount(Direction dir = Get) const wxOVERRIDE {
     // add one more format
-    return wxTextDataObject::GetFormatCount(dir) + 1;
+    return wxTextDataObject::GetFormatCount(dir) + 2;
   }
 
   virtual void GetAllFormats(wxDataFormat *formats, Direction dir = Get) const wxOVERRIDE {
     wxTextDataObject::GetAllFormats(formats, dir);
-    // set type for new format (for some reason "text/plain;charset=utf-8" don't work)
-    formats[wxTextDataObject::GetFormatCount(dir)].SetId("text/plain");
+    // set types for new format
+    // for some reason "text/plain;charset=utf-8" don't work for DnD, but works for Wayland's clipboard,
+    // and reverse
+    size_t formatCount = wxTextDataObject::GetFormatCount(dir);
+    formats[formatCount++].SetId("text/plain");
+    formats[formatCount].SetId("text/plain;charset=utf-8");
   }
   // No need to override SetData, wxTextDataObject put "preferred format" text
   // into all formats
@@ -344,5 +352,44 @@ typedef wxTextDataObject wxTextDataObjectEx;
 // Wrapper for wxTaskBarIcon::IsAvailable() that doesn't crash
 // on Fedora or Ubuntu
 bool IsTaskBarIconAvailable();
+
+/**
+ * Fixes a spinners initial, resp. minimum required size that is needed to fully show the control.
+ */
+void FixInitialSpinnerSize(wxSpinCtrl* control);
+
+/**
+ * A panel in which the image resizes.
+ *
+ * @see https://wiki.wxwidgets.org/An_image_panel
+ */
+class ImagePanel : public wxPanel
+{
+public:
+  ImagePanel(wxPanel *parent, const wxSize &size = wxDefaultSize);
+  ~ImagePanel();
+
+  void OnPaint(wxPaintEvent &event);
+  void OnSize(wxSizeEvent &event);
+
+  bool LoadFromFile(const wxString &file, wxBitmapType format = wxBITMAP_TYPE_ANY);
+  bool LoadFromMemory(wxInputStream &stream);
+
+  void Paint();
+
+  void Clear();
+
+protected:
+  void Render(wxDC &dc);
+  void DrawBitmapCentered(wxDC &dc, const wxSize &drawAreaSize, const wxSize &imageSize);
+  void DetermineImageProperties(const wxImage &image);
+
+private:
+  int m_ImageWidth;           // The non-scaled width of the image.
+  int m_ImageHeight;          // The non-scaled height of the image.
+  double m_ImageAspectRatio;  // The image's aspect ratio.
+  wxImage m_Image;            // The non-scaled image.
+  wxBitmap m_Bitmap;          // The possibly scaled bitmap representation of the image.
+};
 
 #endif // _WXUTILITIES_H_

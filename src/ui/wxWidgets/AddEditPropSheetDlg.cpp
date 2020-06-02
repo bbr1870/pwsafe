@@ -24,6 +24,7 @@
 ////@begin includes
 #include <wx/bookctrl.h>
 #include <wx/datetime.h>
+#include <wx/mstream.h>
 ////@end includes
 
 #include "AddEditPropSheetDlg.h"
@@ -33,6 +34,7 @@
 #include "core/PWCharPool.h"
 #include "core/PWHistory.h"
 #include "core/PWSprefs.h"
+#include "os/media.h"
 #include "os/run.h"
 
 #include <algorithm>
@@ -56,7 +58,7 @@ BEGIN_EVENT_TABLE( AddEditPropSheetDlg, wxPropertySheetDialog )
 
   EVT_BUTTON(       wxID_OK,                 AddEditPropSheetDlg::OnOk                      )
 ////@begin AddEditPropSheetDlg event table entries
-  EVT_BUTTON(       ID_BUTTON2,              AddEditPropSheetDlg::OnShowHideClick           )
+  EVT_BUTTON(       ID_BUTTON_SHOWHIDE,      AddEditPropSheetDlg::OnShowHideClick           )
   EVT_BUTTON(       ID_BUTTON_GENERATE,      AddEditPropSheetDlg::OnGenerateButtonClick     )
   EVT_BUTTON(       ID_GO_BTN,               AddEditPropSheetDlg::OnGoButtonClick           )
   EVT_BUTTON(       ID_SEND_BTN,             AddEditPropSheetDlg::OnSendButtonClick         )
@@ -113,6 +115,21 @@ BEGIN_EVENT_TABLE( AddEditPropSheetDlg, wxPropertySheetDialog )
   EVT_UPDATE_UI(    ID_RADIOBUTTON_NEVER,    AddEditPropSheetDlg::OnUpdateUI                )
 END_EVENT_TABLE()
 
+//(*IdInit(AttachmentTab)
+const long AddEditPropSheetDlg::ID_IMAGEPANEL1 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT1 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_BUTTON_IMPORT = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_BUTTON_EXPORT = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_BUTTON_REMOVE = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_TEXTCTRL2 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT4 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT5 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT6 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT8 = wxWindow::NewControlId();
+const long AddEditPropSheetDlg::ID_STATICTEXT10 = wxWindow::NewControlId();
+//*)
+
+
 /*!
  * AddEditPropSheetDlg constructors
  */
@@ -148,6 +165,10 @@ AddEditPropSheetDlg::AddEditPropSheetDlg(wxWindow* parent, PWScore &core,
     }
   }
   Create(parent, id, dlgTitle, pos, size, style);
+
+  if (m_Core.GetReadFileVersion() == PWSfile::V40) {
+    InitAttachmentTab();
+  }
 }
 
 /*!
@@ -171,7 +192,7 @@ bool AddEditPropSheetDlg::Create( wxWindow* parent, wxWindowID id, const wxStrin
 
   // Additional width is needed by static text (itemStaticText4) at "Basic" tab,
   // otherwise text is not correctly shown due to Auto Word Wrap. (At least at KDE)
-  SetSize(GetSize().GetWidth() + 20, GetSize().GetHeight());
+  SetSizeHints(GetSize().GetWidth() + 20, GetSize().GetHeight());
   return true;
 }
 
@@ -216,6 +237,7 @@ void AddEditPropSheetDlg::Init()
   m_DatesTimesNeverExpireCtrl = nullptr;
   m_PasswordPolicyUseDatabaseCtrl = nullptr;
   m_PasswordPolicyNamesCtrl = nullptr;
+  m_PasswordPolicyPasswordLengthText = nullptr;
   m_PasswordPolicyPasswordLengthCtrl = nullptr;
   m_PasswordPolicySizer = nullptr;
   m_PasswordPolicyUseLowerCaseCtrl = nullptr;
@@ -234,6 +256,19 @@ void AddEditPropSheetDlg::Init()
   m_PasswordPolicyUseEasyCtrl = nullptr;
   m_PasswordPolicyUsePronounceableCtrl = nullptr;
   m_PasswordPolicyUseHexadecimalOnlyCtrl = nullptr;
+  m_AttachmentPanel = nullptr;
+  m_AttachmentImagePanel = nullptr;
+  m_AttachmentButtonImport = nullptr;
+  m_AttachmentButtonExport = nullptr;
+  m_AttachmentButtonRemove = nullptr;
+  m_AttachmentFilePath = nullptr;
+  m_AttachmentTitle = nullptr;
+  m_AttachmentMediaType = nullptr;
+  m_AttachmentCreationDate = nullptr;
+  m_AttachmentFileSize = nullptr;
+  m_AttachmentFileCreationDate = nullptr;
+  m_AttachmentFileLastModifiedDate = nullptr;
+  m_AttachmentPreviewStatus = nullptr;
 ////@end AddEditPropSheetDlg member initialisation
 }
 
@@ -325,11 +360,10 @@ void AddEditPropSheetDlg::CreateControls()
   // Tab: "Attachment"
   /////////////////////////////////////////////////////////////////////////////
 
-/*
-  if (m_Core.GetReadFileVersion() >= PWSfile::V40) {
-    GetBookCtrl()->AddPage(CreateAttachmentPanel(), _("Attachment"));
+  if (m_Core.GetReadFileVersion() == PWSfile::V40) {
+    m_AttachmentPanel = CreateAttachmentPanel();
+    GetBookCtrl()->AddPage(m_AttachmentPanel, _("Attachment"));
   }
-*/
 
   /////////////////////////////////////////////////////////////////////////////
   // End of Tab Creation
@@ -369,8 +403,7 @@ wxPanel* AddEditPropSheetDlg::CreateBasicPanel()
   auto *itemStaticText6 = new wxStaticText( panel, wxID_STATIC, _("Group:"), wxDefaultPosition, wxDefaultSize, 0 );
   m_BasicSizer->Add(itemStaticText6, wxGBPosition(/*row:*/ 0, /*column:*/ 0), wxDefaultSpan,  wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-  wxArrayString groupCtrlStrings;
-  m_BasicGroupNamesCtrl = new wxComboBox( panel, ID_COMBOBOX_GROUP, wxEmptyString, wxDefaultPosition, wxDefaultSize, groupCtrlStrings, wxCB_DROPDOWN );
+  m_BasicGroupNamesCtrl = new wxComboBox( panel, ID_COMBOBOX_GROUP, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_DROPDOWN);
   m_BasicSizer->Add(m_BasicGroupNamesCtrl, wxGBPosition(/*row:*/ 0, /*column:*/ 1), wxDefaultSpan, wxEXPAND|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
   auto *itemStaticText9 = new wxStaticText( panel, wxID_STATIC, _("Title:"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -391,7 +424,7 @@ wxPanel* AddEditPropSheetDlg::CreateBasicPanel()
   m_BasicPasswordTextCtrl = new wxTextCtrl( panel, ID_TEXTCTRL_PASSWORD, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
   m_BasicSizer->Add(m_BasicPasswordTextCtrl, wxGBPosition(/*row:*/ 3, /*column:*/ 1), wxDefaultSpan, wxEXPAND|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-  m_BasicShowHideCtrl = new wxButton( panel, ID_BUTTON2, _("&Hide"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_BasicShowHideCtrl = new wxButton( panel, ID_BUTTON_SHOWHIDE, _("&Hide"), wxDefaultPosition, wxDefaultSize, 0 );
   m_BasicSizer->Add(m_BasicShowHideCtrl, wxGBPosition(/*row:*/ 3, /*column:*/ 2), wxDefaultSpan, wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
   auto *itemButton21 = new wxButton( panel, ID_BUTTON_GENERATE, _("&Generate"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -451,13 +484,13 @@ wxPanel* AddEditPropSheetDlg::CreateAdditionalPanel()
   itemFlexGridSizer40->Add(itemStaticText41, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
   auto *itemTextCtrl42 = new wxTextCtrl(panel, ID_TEXTCTRL_AUTOTYPE, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0);
-  itemFlexGridSizer40->Add(itemTextCtrl42, 0, wxEXPAND | wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  itemFlexGridSizer40->Add(itemTextCtrl42, 0, wxEXPAND | wxALL, 5);
 
   auto *itemStaticText43 = new wxStaticText(panel, wxID_STATIC, _("Run Cmd:"), wxDefaultPosition, wxDefaultSize, 0);
   itemFlexGridSizer40->Add(itemStaticText43, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
   auto *itemTextCtrl44 = new wxTextCtrl(panel, ID_TEXTCTRL_RUN_CMD, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0);
-  itemFlexGridSizer40->Add(itemTextCtrl44, 0, wxEXPAND | wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  itemFlexGridSizer40->Add(itemTextCtrl44, 0, wxEXPAND | wxALL, 5);
 
   auto *itemStaticText45 = new wxStaticText(panel, wxID_STATIC, _("Double-Click Action:"), wxDefaultPosition, wxDefaultSize, 0);
   itemFlexGridSizer40->Add(itemStaticText45, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL | wxALL, 5);
@@ -465,7 +498,7 @@ wxPanel* AddEditPropSheetDlg::CreateAdditionalPanel()
   wxArrayString dcaComboBoxStrings;
   setupDCAStrings(dcaComboBoxStrings);
   m_AdditionalDoubleClickActionCtrl = new wxComboBox(panel, ID_COMBOBOX_DBC_ACTION, wxEmptyString, wxDefaultPosition, wxDefaultSize, dcaComboBoxStrings, wxCB_READONLY);
-  itemFlexGridSizer40->Add(m_AdditionalDoubleClickActionCtrl, 0, wxALIGN_CENTER_HORIZONTAL | wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  itemFlexGridSizer40->Add(m_AdditionalDoubleClickActionCtrl, 0, wxEXPAND | wxALL, 5);
 
   auto *itemStaticText47 = new wxStaticText(panel, wxID_STATIC, _("Shift-Double-Click Action:"), wxDefaultPosition, wxDefaultSize, 0);
   itemFlexGridSizer40->Add(itemStaticText47, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL | wxALL, 5);
@@ -473,7 +506,7 @@ wxPanel* AddEditPropSheetDlg::CreateAdditionalPanel()
   wxArrayString sdcaComboBoxStrings;
   setupDCAStrings(sdcaComboBoxStrings);
   m_AdditionalShiftDoubleClickActionCtrl = new wxComboBox(panel, ID_COMBOBOX_SDBC_ACTION, wxEmptyString, wxDefaultPosition, wxDefaultSize, sdcaComboBoxStrings, wxCB_READONLY);
-  itemFlexGridSizer40->Add(m_AdditionalShiftDoubleClickActionCtrl, 0, wxALIGN_CENTER_HORIZONTAL | wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  itemFlexGridSizer40->Add(m_AdditionalShiftDoubleClickActionCtrl, 0, wxEXPAND | wxALL, 5);
 
   auto *itemStaticBoxSizer49Static = new wxStaticBox(panel, wxID_ANY, _("Password History"));
   auto *itemStaticBoxSizer49 = new wxStaticBoxSizer(itemStaticBoxSizer49Static, wxVERTICAL);
@@ -485,11 +518,13 @@ wxPanel* AddEditPropSheetDlg::CreateAdditionalPanel()
   itemBoxSizer50->Add(itemCheckBox51, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
   m_AdditionalMaxPasswordHistoryCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL_MAX_PW_HIST, _T("0"), wxDefaultPosition, wxSize(60, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL_MAX_PW_HIST, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::NumPWHistoryDefault),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::NumPWHistoryDefault),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::NumPWHistoryDefault)
   );
+
+  FixInitialSpinnerSize(m_AdditionalMaxPasswordHistoryCtrl);
 
   itemBoxSizer50->Add(m_AdditionalMaxPasswordHistoryCtrl, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
@@ -553,11 +588,13 @@ wxPanel* AddEditPropSheetDlg::CreateDatesTimesPanel()
   itemFlexGridSizer63->Add(itemBoxSizer68, 0, wxALIGN_CENTER_HORIZONTAL | wxALIGN_CENTER_VERTICAL | wxALL, 0);
 
   m_DatesTimesExpiryTimeCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL_EXP_TIME, _T("90"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL_EXP_TIME, _T("90"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::DefaultExpiryDays),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::DefaultExpiryDays),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::DefaultExpiryDays)
   );
+
+  FixInitialSpinnerSize(m_DatesTimesExpiryTimeCtrl);
 
   itemBoxSizer68->Add(m_DatesTimesExpiryTimeCtrl, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
@@ -633,7 +670,7 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
   itemBoxSizer61->Add(itemStaticBoxSizer88, 0, wxEXPAND | wxALL, 5);
 
   auto *itemBoxSizer89 = new wxBoxSizer(wxHORIZONTAL);
-  itemStaticBoxSizer88->Add(itemBoxSizer89, 0, wxEXPAND | wxALL, 0);
+  itemStaticBoxSizer88->Add(itemBoxSizer89, 2, wxEXPAND | wxALL, 0);
 
   m_PasswordPolicyUseDatabaseCtrl = new wxCheckBox(panel, ID_CHECKBOX42, _("Use Database Policy"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
   m_PasswordPolicyUseDatabaseCtrl->SetValue(false);
@@ -643,22 +680,24 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
 
   wxArrayString m_cbxPolicyNamesStrings;
   m_PasswordPolicyNamesCtrl = new wxComboBox(panel, ID_POLICYLIST, wxEmptyString, wxDefaultPosition, wxDefaultSize, m_cbxPolicyNamesStrings, wxCB_READONLY);
-  itemBoxSizer89->Add(m_PasswordPolicyNamesCtrl, 0, wxALIGN_TOP | wxALL, 5);
+  itemBoxSizer89->Add(m_PasswordPolicyNamesCtrl, 3, wxALIGN_TOP | wxALL, 5);
 
   auto *itemStaticLine94 = new wxStaticLine(panel, wxID_STATIC, wxDefaultPosition, wxDefaultSize, wxLI_HORIZONTAL);
   itemStaticBoxSizer88->Add(itemStaticLine94, 0, wxEXPAND | wxALL, 5);
 
   auto *itemBoxSizer95 = new wxBoxSizer(wxHORIZONTAL);
   itemStaticBoxSizer88->Add(itemBoxSizer95, 0, wxALIGN_LEFT | wxALL, 5);
-  auto *itemStaticText96 = new wxStaticText(panel, wxID_STATIC, _("Password length:"), wxDefaultPosition, wxDefaultSize, 0);
-  itemBoxSizer95->Add(itemStaticText96, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT | wxALL, 5);
+  m_PasswordPolicyPasswordLengthText = new wxStaticText(panel, wxID_STATIC, _("Password length:"), wxDefaultPosition, wxDefaultSize, 0);
+  itemBoxSizer95->Add(m_PasswordPolicyPasswordLengthText, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT | wxALL, 5);
 
   m_PasswordPolicyPasswordLengthCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL3, _T("12"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL3, _T("12"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::PWDefaultLength),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::PWDefaultLength),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::PWDefaultLength)
   );
+
+  FixInitialSpinnerSize(m_PasswordPolicyPasswordLengthCtrl);
 
   itemBoxSizer95->Add(m_PasswordPolicyPasswordLengthCtrl, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
@@ -673,19 +712,21 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
   m_PasswordPolicyLowerCaseMinSizer = new wxBoxSizer(wxHORIZONTAL);
   m_PasswordPolicySizer->Add(m_PasswordPolicyLowerCaseMinSizer, 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL | wxALL, 0);
   auto *itemStaticText101 = new wxStaticText(panel, wxID_STATIC, _("(At least "), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyLowerCaseMinSizer->Add(itemStaticText101, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyLowerCaseMinSizer->Add(itemStaticText101, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   m_PasswordPolicyLowerCaseMinCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL5, _T("0"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL5, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::PWLowercaseMinLength),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::PWLowercaseMinLength),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::PWLowercaseMinLength)
   );
 
+  FixInitialSpinnerSize(m_PasswordPolicyLowerCaseMinCtrl);
+
   m_PasswordPolicyLowerCaseMinSizer->Add(m_PasswordPolicyLowerCaseMinCtrl, 0, wxALIGN_CENTER_VERTICAL | wxBOTTOM, 5);
 
   auto *itemStaticText103 = new wxStaticText(panel, wxID_STATIC, _(")"), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyLowerCaseMinSizer->Add(itemStaticText103, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyLowerCaseMinSizer->Add(itemStaticText103, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   // Upper Case Rules
   m_PasswordPolicyUseUpperCaseCtrl = new wxCheckBox(panel, ID_CHECKBOX4, _("Use UPPERCASE letters"), wxDefaultPosition, wxDefaultSize, 0);
@@ -695,19 +736,21 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
   m_PasswordPolicyUpperCaseMinSizer = new wxBoxSizer(wxHORIZONTAL);
   m_PasswordPolicySizer->Add(m_PasswordPolicyUpperCaseMinSizer, 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL | wxALL, 0);
   auto *itemStaticText106 = new wxStaticText(panel, wxID_STATIC, _("(At least "), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyUpperCaseMinSizer->Add(itemStaticText106, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyUpperCaseMinSizer->Add(itemStaticText106, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   m_PasswordPolicyUpperCaseMinCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL6, _T("0"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL6, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::PWUppercaseMinLength),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::PWUppercaseMinLength),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::PWUppercaseMinLength)
   );
 
+  FixInitialSpinnerSize(m_PasswordPolicyUpperCaseMinCtrl);
+
   m_PasswordPolicyUpperCaseMinSizer->Add(m_PasswordPolicyUpperCaseMinCtrl, 0, wxALIGN_CENTER_VERTICAL | wxBOTTOM, 5);
 
   auto *itemStaticText108 = new wxStaticText(panel, wxID_STATIC, _(")"), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyUpperCaseMinSizer->Add(itemStaticText108, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyUpperCaseMinSizer->Add(itemStaticText108, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   // Digits Rules
   m_PasswordPolicyUseDigitsCtrl = new wxCheckBox(panel, ID_CHECKBOX5, _("Use digits"), wxDefaultPosition, wxDefaultSize, 0);
@@ -717,19 +760,21 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
   m_PasswordPolicyDigitsMinSizer = new wxBoxSizer(wxHORIZONTAL);
   m_PasswordPolicySizer->Add(m_PasswordPolicyDigitsMinSizer, 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL | wxALL, 0);
   auto *itemStaticText111 = new wxStaticText(panel, wxID_STATIC, _("(At least "), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyDigitsMinSizer->Add(itemStaticText111, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyDigitsMinSizer->Add(itemStaticText111, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   m_PasswordPolicyDigitsMinCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL7, _T("0"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL7, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::PWDigitMinLength),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::PWDigitMinLength),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::PWDigitMinLength)
   );
 
+  FixInitialSpinnerSize(m_PasswordPolicyDigitsMinCtrl);
+
   m_PasswordPolicyDigitsMinSizer->Add(m_PasswordPolicyDigitsMinCtrl, 0, wxALIGN_CENTER_VERTICAL | wxBOTTOM, 5);
 
   auto *itemStaticText113 = new wxStaticText(panel, wxID_STATIC, _(")"), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicyDigitsMinSizer->Add(itemStaticText113, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicyDigitsMinSizer->Add(itemStaticText113, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   // Symbols Rules
   m_PasswordPolicyUseSymbolsCtrl = new wxCheckBox(panel, ID_CHECKBOX6, _("Use symbols"), wxDefaultPosition, wxDefaultSize, 0);
@@ -740,19 +785,21 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
   m_PasswordPolicySymbolsMinSizer = new wxBoxSizer(wxHORIZONTAL);
   m_PasswordPolicySizer->Add(m_PasswordPolicySymbolsMinSizer, 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL | wxALL, 0);
   auto *itemStaticText116 = new wxStaticText(panel, wxID_STATIC, _("(At least "), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicySymbolsMinSizer->Add(itemStaticText116, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicySymbolsMinSizer->Add(itemStaticText116, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   m_PasswordPolicySymbolsMinCtrl = new wxSpinCtrl(
-    panel, ID_SPINCTRL8, _T("0"), wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS,
+    panel, ID_SPINCTRL8, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS,
     PWSprefs::GetInstance()->GetPrefMinVal(PWSprefs::PWSymbolMinLength),
     PWSprefs::GetInstance()->GetPrefMaxVal(PWSprefs::PWSymbolMinLength),
     PWSprefs::GetInstance()->GetPrefDefVal(PWSprefs::PWSymbolMinLength)
   );
 
+  FixInitialSpinnerSize(m_PasswordPolicySymbolsMinCtrl);
+
   m_PasswordPolicySymbolsMinSizer->Add(m_PasswordPolicySymbolsMinCtrl, 0, wxALIGN_CENTER_VERTICAL | wxBOTTOM, 5);
 
   auto *itemStaticText118 = new wxStaticText(panel, wxID_STATIC, _(")"), wxDefaultPosition, wxDefaultSize, 0);
-  m_PasswordPolicySymbolsMinSizer->Add(itemStaticText118, 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
+  m_PasswordPolicySymbolsMinSizer->Add(itemStaticText118, 0, wxALIGN_CENTER_VERTICAL | wxLEFT|wxBOTTOM|wxRIGHT, 5);
 
   // Own Symbols Rules
   m_PasswordPolicyOwnSymbolsTextCtrl = new wxTextCtrl(panel, IDC_OWNSYMBOLS, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0);
@@ -791,7 +838,485 @@ wxPanel* AddEditPropSheetDlg::CreatePasswordPolicyPanel()
 
 wxPanel* AddEditPropSheetDlg::CreateAttachmentPanel()
 {
-  return nullptr;
+  auto *panel = new wxPanel(GetBookCtrl(), ID_PANEL_ADDITIONAL, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+  auto *BoxSizerMain = new wxBoxSizer(wxVERTICAL);
+
+  StaticBoxSizerPreview = new wxStaticBoxSizer(wxHORIZONTAL, panel, _("Preview"));
+  m_AttachmentImagePanel = new ImagePanel(panel, wxDefaultSize);
+  StaticBoxSizerPreview->Add(m_AttachmentImagePanel, 1, wxALL|wxEXPAND, 5);
+  m_AttachmentPreviewStatus = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTRE_HORIZONTAL, _T("ID_STATICTEXT_STATUS"));
+  StaticBoxSizerPreview->Add(m_AttachmentPreviewStatus, 1, wxALL|wxALIGN_CENTER, 5);
+  StaticBoxSizerPreview->SetMinSize(wxSize(-1, 300));
+  BoxSizerMain->Add(StaticBoxSizerPreview, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticBoxSizerFile = new wxStaticBoxSizer(wxVERTICAL, panel, _("File"));
+  m_AttachmentFilePath = new wxStaticText(panel, wxID_ANY, _("N/A"), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT|wxST_ELLIPSIZE_MIDDLE, _T("ID_STATICTEXT_STATUS"));
+  StaticBoxSizerFile->Add(m_AttachmentFilePath, 0, wxALL|wxEXPAND, 5);
+
+  auto *BoxSizer3 = new wxBoxSizer(wxHORIZONTAL);
+  m_AttachmentButtonImport = new wxButton(panel, ID_BUTTON_IMPORT, _("Import..."), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_BUTTON1"));
+  BoxSizer3->Add(m_AttachmentButtonImport, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentButtonExport = new wxButton(panel, ID_BUTTON_EXPORT, _("Export..."), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_BUTTON2"));
+  BoxSizer3->Add(m_AttachmentButtonExport, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentButtonRemove = new wxButton(panel, ID_BUTTON_REMOVE, _("Remove"), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_BUTTON3"));
+  BoxSizer3->Add(m_AttachmentButtonRemove, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+  StaticBoxSizerFile->Add(BoxSizer3, 0, wxALL|wxEXPAND, 5);
+  BoxSizerMain->Add(StaticBoxSizerFile, 0, wxALL|wxEXPAND, 5);
+
+  auto *StaticBoxSizerProperties = new wxStaticBoxSizer(wxHORIZONTAL, panel, _("Properties"));
+  auto *FlexGridSizer1 = new wxFlexGridSizer(0, 2, 0, 0);
+  FlexGridSizer1->AddGrowableCol(1);
+
+  auto *StaticText3 = new wxStaticText(panel, wxID_ANY, _("Title:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText3, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentTitle = new wxTextCtrl(panel, ID_TEXTCTRL2, _("Text"), wxDefaultPosition, wxSize(217,35), 0, wxDefaultValidator, _T("ID_TEXTCTRL2"));
+  FlexGridSizer1->Add(m_AttachmentTitle, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticText2 = new wxStaticText(panel, wxID_ANY, _("Media Type:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText2, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentMediaType = new wxStaticText(panel, ID_STATICTEXT4, _("Label1"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT4"));
+  FlexGridSizer1->Add(m_AttachmentMediaType, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticText4 = new wxStaticText(panel, wxID_ANY, _("Creation Date:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText4, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentCreationDate = new wxStaticText(panel, ID_STATICTEXT5, _("Label2"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT5"));
+  FlexGridSizer1->Add(m_AttachmentCreationDate, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticText5 = new wxStaticText(panel, wxID_ANY, _("File Size:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText5, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentFileSize = new wxStaticText(panel, ID_STATICTEXT6, _("Label3"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT6"));
+  FlexGridSizer1->Add(m_AttachmentFileSize, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticText7 = new wxStaticText(panel, wxID_ANY, _("File Creation Date:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText7, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentFileCreationDate = new wxStaticText(panel, ID_STATICTEXT8, _("Label4"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT8"));
+  FlexGridSizer1->Add(m_AttachmentFileCreationDate, 1, wxALL|wxEXPAND, 5);
+
+  auto *StaticText9 = new wxStaticText(panel, wxID_ANY, _("File Last Modified Date:"), wxDefaultPosition, wxDefaultSize, 0, _T("wxID_ANY"));
+  FlexGridSizer1->Add(StaticText9, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5);
+  m_AttachmentFileLastModifiedDate = new wxStaticText(panel, ID_STATICTEXT10, _("Label5"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT10"));
+  FlexGridSizer1->Add(m_AttachmentFileLastModifiedDate, 1, wxALL|wxEXPAND, 5);
+  StaticBoxSizerProperties->Add(FlexGridSizer1, 1, wxALL|wxEXPAND, 5);
+  BoxSizerMain->Add(StaticBoxSizerProperties, 0, wxALL|wxEXPAND, 5);
+
+  panel->SetSizer(BoxSizerMain);
+
+  Bind(wxEVT_COMMAND_BUTTON_CLICKED, &AddEditPropSheetDlg::OnImport, this, ID_BUTTON_IMPORT);
+  Bind(wxEVT_COMMAND_BUTTON_CLICKED, &AddEditPropSheetDlg::OnExport, this, ID_BUTTON_EXPORT);
+  Bind(wxEVT_COMMAND_BUTTON_CLICKED, &AddEditPropSheetDlg::OnRemove, this, ID_BUTTON_REMOVE);
+  //*)
+
+  return panel;
+}
+
+void AddEditPropSheetDlg::InitAttachmentTab()
+{
+  if (m_Item.HasAttRef()) {
+
+    // Get attachment item
+    auto uuid = m_Item.GetAttUUID();
+    m_ItemAttachment = m_Core.GetAtt(uuid);
+
+    if (m_ItemAttachment.HasContent()) {
+
+      // Mark the attachment from the 'Core' explicitly as 'CLEAN'.
+      // The status will be updated on any modification and evaluated at 'OnOk'
+      // to determine the necessary action.
+      m_ItemAttachment.SetStatus(CItem::EntryStatus::ES_CLEAN);
+
+      // Show attachment data on UI.
+      ShowAttachmentData(m_ItemAttachment);
+
+      // Attachment must be removed before a new one can be imported again.
+      DisableImport();
+    }
+    else {
+      ResetAttachmentData();
+    }
+  }
+  else {
+    ResetAttachmentData();
+    HideImagePreview(_("No Attachment Available"));
+    EnableImport();
+  }
+}
+
+/**
+ * Updates the attachment data on the UI.
+ */
+void AddEditPropSheetDlg::ShowAttachmentData(const CItemAtt &itemAttachment)
+{
+  // Get attachment's file path
+  auto filePath = itemAttachment.GetFilePath() + itemAttachment.GetFileName();
+
+  if (filePath.empty()) {
+    m_AttachmentFilePath->SetLabel(_("N/A"));
+  }
+  else {
+    m_AttachmentFilePath->SetLabel(stringx2std(filePath));
+  }
+
+  // Get attachment's title
+  if (itemAttachment.GetTitle().empty()) {
+    m_AttachmentTitle->SetValue(_("N/A"));
+  }
+  else {
+    m_AttachmentTitle->SetValue(stringx2std(itemAttachment.GetTitle()));
+  }
+
+  // Get attachment's media type
+  auto mediaTypeDescription = stringx2std(itemAttachment.GetMediaType());
+
+  if (mediaTypeDescription.empty()) {
+    m_AttachmentMediaType->SetLabel(_("N/A"));
+  }
+  else if (mediaTypeDescription == L"unknown") {
+    m_AttachmentMediaType->SetLabel(_("Unknown"));
+  }
+  else {
+    m_AttachmentMediaType->SetLabel(mediaTypeDescription);
+  }
+
+  // Get attachment's creation date
+  if (itemAttachment.GetCTime().empty()) {
+    m_AttachmentCreationDate->SetLabel(_("N/A"));
+  }
+  else {
+    m_AttachmentCreationDate->SetLabel(stringx2std(itemAttachment.GetCTime()));
+  }
+
+  // Get attachment's size
+  m_AttachmentFileSize->SetLabel(wxString::Format(wxT("%u"), (unsigned int)itemAttachment.GetContentSize()));
+
+  // Get attachment's file creation date
+  if (itemAttachment.GetFileCTime().empty()) {
+    m_AttachmentFileCreationDate->SetLabel(_("N/A"));
+  }
+  else {
+    m_AttachmentFileCreationDate->SetLabel(stringx2std(itemAttachment.GetFileCTime()));
+  }
+
+  // Get attachment's last modification date
+  if (itemAttachment.GetFileMTime().empty()) {
+    m_AttachmentFileLastModifiedDate->SetLabel(_("N/A"));
+  }
+  else {
+    m_AttachmentFileLastModifiedDate->SetLabel(stringx2std(itemAttachment.GetFileMTime()));
+  }
+
+  // Show attachment preview if it is an image,
+  // otherwise show text indicating that no preview is available.
+  if (IsMimeTypeImage(mediaTypeDescription)) {
+    if (LoadImagePreview(itemAttachment)) {
+      ShowImagePreview();
+    }
+    else {
+      HideImagePreview(_("No preview available due to an error"));
+    }
+  }
+  else {
+    HideImagePreview(_("No preview available - unsupported media type"));
+  }
+}
+
+void AddEditPropSheetDlg::ResetAttachmentData()
+{
+  m_AttachmentFilePath->SetLabel(_("N/A"));
+  m_AttachmentTitle->SetValue(_("N/A"));
+  m_AttachmentMediaType->SetLabel(_("N/A"));
+  m_AttachmentCreationDate->SetLabel(_("N/A"));
+  m_AttachmentFileSize->SetLabel(_("N/A"));
+  m_AttachmentFileCreationDate->SetLabel(_("N/A"));
+  m_AttachmentFileLastModifiedDate->SetLabel(_("N/A"));
+  m_AttachmentImagePanel->Clear();
+  m_ItemAttachment.Clear();
+}
+
+/**
+ * Loads the attachments image data for showing it on the image panel.
+ */
+bool AddEditPropSheetDlg::LoadImagePreview(const CItemAtt &itemAttachment)
+{
+  auto size = itemAttachment.GetContentSize();
+
+  if (size <= 0) {
+    return false;
+  }
+
+  unsigned char buffer[size];
+
+  if (!itemAttachment.GetContent(buffer, size)) {
+    wxMessageDialog(
+      this,
+      _("An error occurred while trying to get the image data from database item.\n"
+      "Therefore, the image cannot be displayed in the preview."), _("Image Preview"),
+      wxICON_ERROR
+    ).ShowModal();
+
+    return false;
+  }
+
+  wxMemoryInputStream stream(&buffer, size);
+
+  if (!m_AttachmentImagePanel->LoadFromMemory(stream)) {
+    wxMessageDialog(
+      this,
+      _("An error occurred while trying to load the image data into the preview area.\n"
+      "Therefore, the image cannot be displayed in the preview."), _("Image Preview"),
+      wxICON_ERROR
+    ).ShowModal();
+
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Show image panel and hide the static text
+ * that indicates that no preview is available.
+ */
+void AddEditPropSheetDlg::ShowImagePreview()
+{
+  m_AttachmentPreviewStatus->SetLabel(wxEmptyString);
+  StaticBoxSizerPreview->Hide(m_AttachmentPreviewStatus);
+  StaticBoxSizerPreview->Show(m_AttachmentImagePanel);
+  StaticBoxSizerPreview->Layout();
+}
+
+/**
+ * Hide the image panel and show static text
+ * that indicates that no preview is available.
+ */
+void AddEditPropSheetDlg::HideImagePreview(const wxString &reason)
+{
+  m_AttachmentPreviewStatus->SetLabel(reason);
+  StaticBoxSizerPreview->Hide(m_AttachmentImagePanel);
+  StaticBoxSizerPreview->Show(m_AttachmentPreviewStatus);
+  StaticBoxSizerPreview->Layout();
+}
+
+/**
+ * Returns 'true' if file's mime type is image, otherwise 'false'.
+ */
+bool AddEditPropSheetDlg::IsFileMimeTypeImage(const wxString &filename)
+{
+  return IsMimeTypeImage(pws_os::GetMediaType(tostdstring(filename)));
+}
+
+/**
+ * Returns 'true' if the mime type description begins with 'image'.
+ *
+ * Example: "image/png", "application/zip"
+ */
+bool AddEditPropSheetDlg::IsMimeTypeImage(const stringT &mimeTypeDescription)
+{
+  const stringT IMAGE = L"image";
+
+  if (mimeTypeDescription.length() < IMAGE.length()) {
+    return false;
+  }
+  else {
+    return (mimeTypeDescription.substr(0, 5) == IMAGE) ? true : false;
+  }
+}
+
+/**
+ * Returns the mime type extension that follows after the slash.
+ *
+ * Example: "image/png" -> "png", "application/zip" -> "zip"
+ */
+wxString AddEditPropSheetDlg::GetMimeTypeExtension(const stringT &mimeTypeDescription)
+{
+  if (mimeTypeDescription.find('/') == std::string::npos) {
+    return wxEmptyString;
+  }
+  else {
+    return mimeTypeDescription.substr(mimeTypeDescription.find('/') + 1, mimeTypeDescription.length());
+  }
+}
+
+void AddEditPropSheetDlg::EnableImport()
+{
+  m_AttachmentButtonImport->Enable();
+  m_AttachmentButtonExport->Disable();
+  m_AttachmentButtonRemove->Disable();
+}
+
+void AddEditPropSheetDlg::DisableImport()
+{
+  m_AttachmentButtonImport->Disable();
+  m_AttachmentButtonExport->Enable();
+  m_AttachmentButtonRemove->Enable();
+}
+
+void AddEditPropSheetDlg::OnImport(wxCommandEvent& WXUNUSED(event))
+{
+  wxString fileFilter =
+  _("Image files ") + 
+  wxImage::GetImageExtWildcard() + wxT("|") +
+  _("All files (*.*)|*.*");
+
+  wxFileDialog fileDialog(
+    this, _("Import Attachment"), "", "",
+    fileFilter,
+    wxFD_OPEN | wxFD_FILE_MUST_EXIST
+  );
+
+  if (fileDialog.ShowModal() != wxID_OK) {
+    return;
+  }
+
+  auto status = m_ItemAttachment.Import(fileDialog.GetPath().ToStdWstring());
+
+  switch (status)
+  {
+  case PWScore::SUCCESS: {
+      m_ItemAttachment.CreateUUID(); // Used by 'AddEntryCommand' to associate the attachment with the item.
+      m_ItemAttachment.SetStatus(CItem::EntryStatus::ES_ADDED);
+
+      // Show attachment data on UI.
+      ShowAttachmentData(m_ItemAttachment);
+
+      // Attachment must be removed before a new one can be imported again.
+      DisableImport();
+    }
+    break;
+  case PWScore::FAILURE:
+    wxMessageDialog(
+      this,
+      _("Failed to allocate required memory to import attachment data."), _("Import Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  case PWScore::CANT_OPEN_FILE:
+    wxMessageDialog(
+      this,
+      _("Failed to open file."), _("Import Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  case PWScore::MAX_SIZE_EXCEEDED:
+    wxMessageDialog(
+      this,
+      _("File exceeds the allowed maximum size of 4.3GB (2^32GB)."), _("Import Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  case PWScore::READ_FAIL:
+    wxMessageDialog(
+      this,
+      _("An error occurred while reading the file."), _("Import Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  default:
+    wxMessageDialog(
+      this,
+      _("Unexpected error occured during attachment import."), _("Import Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  }
+}
+
+void AddEditPropSheetDlg::OnExport(wxCommandEvent& WXUNUSED(event))
+{
+  if (!m_ItemAttachment.HasContent()) {
+
+    wxMessageDialog(
+      this,
+      _("No attachment data to export."), _("Export Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+
+    return;
+  }
+
+  wxString fileFilter;
+
+  auto mimeTypeExtension = GetMimeTypeExtension(stringx2std(m_ItemAttachment.GetMediaType()));
+
+  if (!mimeTypeExtension.empty()) {
+
+    wxString mimeTypeFilter;
+
+    if (mimeTypeExtension.Lower() == wxT("jpeg")) {
+      mimeTypeFilter = wxString::Format(_("%s files (*.%s;*.jpg)|*.%s;*.jpg|"),
+        mimeTypeExtension.Upper(), mimeTypeExtension.Lower(), mimeTypeExtension.Lower()
+      );
+    }
+    else if (mimeTypeExtension.Lower() == wxT("gzip")) {
+      mimeTypeFilter = wxString::Format(_("%s files (*.%s;*.gz)|*.%s;*.gz|"),
+        mimeTypeExtension.Upper(), mimeTypeExtension.Lower(), mimeTypeExtension.Lower()
+      );
+    }
+    else {
+      mimeTypeFilter = wxString::Format(_("%s files (*.%s)|*.%s|"),
+        mimeTypeExtension.Upper(), mimeTypeExtension.Lower(), mimeTypeExtension.Lower()
+      );
+    }
+
+    fileFilter.Append(mimeTypeFilter);
+  }
+
+  fileFilter.Append(_("All files (*.*)|*.*"));
+
+  wxFileDialog fileDialog(
+    this, _("Export Attachment"), "", "",
+    fileFilter,
+    wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+  );
+
+  if (fileDialog.ShowModal() != wxID_OK) {
+    return;
+  }
+
+  auto status = m_ItemAttachment.Export(fileDialog.GetPath().ToStdWstring());
+
+  switch (status)
+  {
+  case PWScore::SUCCESS:
+    break;
+  case PWScore::FAILURE:
+    wxMessageDialog(
+      this,
+      _("Failed to allocate required memory to export attachment data."), _("Export Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  case PWScore::CANT_OPEN_FILE:
+    wxMessageDialog(
+      this,
+      _("Failed to open file."), _("Export Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  case PWScore::WRITE_FAIL:
+    wxMessageDialog(
+      this,
+      _("An error occurred while writing the file."), _("Export Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  default:
+    wxMessageDialog(
+      this,
+      _("Unexpected error occured during attachment export."), _("Export Attachment"),
+      wxICON_ERROR
+    ).ShowModal();
+    break;
+  }
+}
+
+void AddEditPropSheetDlg::OnRemove(wxCommandEvent& WXUNUSED(event))
+{
+  HideImagePreview();
+  EnableImport();
+
+  ResetAttachmentData();
+
+  m_ItemAttachment.SetStatus(CItem::EntryStatus::ES_DELETED);
 }
 
 void AddEditPropSheetDlg::ApplyFontPreferences()
@@ -903,6 +1428,7 @@ void AddEditPropSheetDlg::UpdatePWPolicyControls(const PWPolicy& pwp)
 void AddEditPropSheetDlg::EnablePWPolicyControls(bool enable)
 {
   m_PasswordPolicyNamesCtrl->Enable(!enable);
+  m_PasswordPolicyPasswordLengthText->Enable(enable);
   m_PasswordPolicyPasswordLengthCtrl->Enable(enable);
   EnableSizerChildren(m_PasswordPolicySizer, enable && !m_PasswordPolicyUseHexadecimalOnlyCtrl->GetValue());
   m_PasswordPolicyUseHexadecimalOnlyCtrl->Enable(enable);
@@ -1018,29 +1544,26 @@ void AddEditPropSheetDlg::UpdateExpTimes()
 
 void AddEditPropSheetDlg::ItemFieldsToPropSheet()
 {
-  std::vector<stringT> svec;
-  std::vector<stringT>::iterator sviter;
+  std::vector<stringT> names;
 
   PWSprefs *prefs = PWSprefs::GetInstance();
   
   // Populate the group combo box
-  m_Core.GetAllGroups(svec);
-  for (sviter = svec.begin(); sviter != svec.end(); sviter++)
-    m_BasicGroupNamesCtrl->Append(sviter->c_str());
+  m_Core.GetAllGroups(names);
+  for (auto const& name : names) {
+    m_BasicGroupNamesCtrl->Append(name);
+  }
 
   // select relevant group
   const StringX group = (m_Type == SheetType::ADD ? tostringx(m_SelectedGroup): m_Item.GetGroup());
   if (!group.empty()) {
-    bool foundGroup = false;
-    for (size_t igrp = 0; igrp < svec.size(); igrp++) {
-      if (group == svec[igrp].c_str()) {
-        m_BasicGroupNamesCtrl->SetSelection(static_cast<int>(igrp));
-        foundGroup =true;
-        break;
-      }
+    auto position = m_BasicGroupNamesCtrl->FindString(stringx2std(group));
+    if (position != wxNOT_FOUND) {
+      m_BasicGroupNamesCtrl->SetSelection(position);
     }
-    if (!foundGroup)
+    else {
       m_BasicGroupNamesCtrl->SetValue(m_SelectedGroup);
+    }
   }
   m_Title = m_Item.GetTitle().c_str();
   m_User = m_Item.GetUser().c_str();
@@ -1150,9 +1673,10 @@ void AddEditPropSheetDlg::ItemFieldsToPropSheet()
   PWPolicy policy;
   // Populate the policy names combo box:
   m_PasswordPolicyNamesCtrl->Append(_("Default Policy"));
-  m_Core.GetPolicyNames(svec);
-  for (sviter = svec.begin(); sviter != svec.end(); sviter++)
-    m_PasswordPolicyNamesCtrl->Append(sviter->c_str());
+  m_Core.GetPolicyNames(names);
+  for (auto const& name : names) {
+    m_PasswordPolicyNamesCtrl->Append(name);
+  }
   // Does item use a named policy or item-specific policy?
   bool namedPwPolicy = !m_Item.GetPolicyName().empty();
   UNREFERENCED_PARAMETER(namedPwPolicy); // Remove MS Compiler warning
@@ -1431,42 +1955,49 @@ void AddEditPropSheetDlg::OnOk(wxCommandEvent& WXUNUSED(evt))
         // now get dbox's effective policy:
         pwp = GetSelectedPWPolicy();
 
-        bIsModified = (group       != m_Item.GetGroup().c_str()       ||
-                      m_Title      != m_Item.GetTitle().c_str()       ||
-                      m_User       != m_Item.GetUser().c_str()        ||
-                      m_Notes      != m_Item.GetNotes(TCHAR('\n')).c_str()       ||
-                      m_Url        != m_Item.GetURL().c_str()         ||
-                      m_Email      != m_Item.GetEmail().c_str()       ||
-                      m_Autotype   != m_Item.GetAutoType().c_str()    ||
-                      m_RunCommand     != m_Item.GetRunCommand().c_str()  ||
-                      m_DoubleClickAction        != lastDCA                         ||
-                      m_ShiftDoubleClickAction   != lastShiftDCA                    ||
-                      m_PasswordHistory  != m_Item.GetPWHistory().c_str()   ||
-                      m_tttExpirationTime   != lastXtime                       ||
-                      m_ExpirationTimeInterval   != lastXTimeInt                    ||
-                      m_Symbols    != m_Item.GetSymbols().c_str()     ||
-                      oldPWP       != pwp);
+        bIsModified = (
+          group                     != m_Item.GetGroup().c_str()            ||
+          m_Title                   != m_Item.GetTitle().c_str()            ||
+          m_User                    != m_Item.GetUser().c_str()             ||
+          m_Notes                   != m_Item.GetNotes(TCHAR('\n')).c_str() ||
+          m_Url                     != m_Item.GetURL().c_str()              ||
+          m_Email                   != m_Item.GetEmail().c_str()            ||
+          m_Autotype                != m_Item.GetAutoType().c_str()         ||
+          m_RunCommand              != m_Item.GetRunCommand().c_str()       ||
+          m_DoubleClickAction       != lastDCA                              ||
+          m_ShiftDoubleClickAction  != lastShiftDCA                         ||
+          m_PasswordHistory         != m_Item.GetPWHistory().c_str()        ||
+          m_tttExpirationTime       != lastXtime                            ||
+          m_ExpirationTimeInterval  != lastXTimeInt                         ||
+          m_Symbols                 != m_Item.GetSymbols().c_str()          ||
+          oldPWP                    != pwp
+        );
 
+        /*
+          Fixme:
+          Even if there have been no changes and the user has pressed the Ok button,
+          the password history check and symbols check result to 'true'.
+        */
 
-          if (!m_Item.IsAlias()) {
-            bIsPSWDModified = (password != m_Item.GetPassword());
+        if (!m_Item.IsAlias()) {
+          bIsPSWDModified = (password != m_Item.GetPassword());
+        }
+        else {
+          // Update password to alias form
+          // Show text stating that it is an alias
+          const CItemData *pbci = m_Core.GetBaseEntry(&m_Item);
+          ASSERT(pbci);
+          if (pbci) {
+            StringX alias = L"[" +
+                pbci->GetGroup() + L":" +
+                pbci->GetTitle() + L":" +
+                pbci->GetUser()  + L"]";
+            bIsPSWDModified = (password != alias);
           }
           else {
-            // Update password to alias form
-            // Show text stating that it is an alias
-            const CItemData *pbci = m_Core.GetBaseEntry(&m_Item);
-            ASSERT(pbci);
-            if (pbci) {
-              StringX alias = L"[" +
-                  pbci->GetGroup() + L":" +
-                  pbci->GetTitle() + L":" +
-                  pbci->GetUser()  + L"]";
-              bIsPSWDModified = (password != alias);
-            }
-            else {
-              bIsPSWDModified = true;
-            }
+            bIsPSWDModified = true;
           }
+        }
 
         if (bIsModified) {
           // Just modify all - even though only 1 may have actually been modified
@@ -1548,15 +2079,146 @@ void AddEditPropSheetDlg::OnOk(wxCommandEvent& WXUNUSED(evt))
         } else {
           m_Item.SetXTimeInt(0);
         }
-        // All fields in m_item now reflect user's edits
-        // Let's update the core's data
-        uuid_array_t uuid;
-        m_Item.GetUUID(uuid);
-        auto listpos = m_Core.Find(uuid);
-        ASSERT(listpos != m_Core.GetEntryEndIter());
-        m_Core.Execute(EditEntryCommand::Create(&m_Core,
-                                                m_Core.GetEntry(listpos),
-                                                m_Item));
+
+        /////////////////////////////////////////////////////////////////////////////
+        // Tab: "Attachment"
+        /////////////////////////////////////////////////////////////////////////////
+
+        bool isAttachmentModified = false;
+
+        if (m_Core.GetReadFileVersion() == PWSfile::V40) {
+
+          if (m_Item.HasAttRef()) {
+            auto uuid = m_Item.GetAttUUID();
+            auto itemAttachment = m_Core.GetAtt(uuid);
+
+            auto hasTitleChanges = (towxstring(m_ItemAttachment.GetTitle()) != m_AttachmentTitle->GetValue());
+            auto hasAttachmentChanges = (m_ItemAttachment != itemAttachment);
+
+            isAttachmentModified = (
+              hasTitleChanges ||
+              hasAttachmentChanges
+            );
+          }
+
+          /*
+            Case: Item doesn't have an attachment and doesn't get one.
+            Steps:
+              - none
+            */
+          if (!m_Item.HasAttRef() && !m_ItemAttachment.HasUUID() && !m_ItemAttachment.HasContent()) {
+            ; // Nothing to do. - Phew!
+          }
+
+          /*
+            Case: Item doesn't have an attachment and shall get one.
+            Steps:
+              1) Update attachment meta data.
+              2) Associate the attachment with the item (CItemData).
+              3) Add attachment (CItemAtt) to the core.
+              4) Update item's status.
+          */
+          else if (!m_Item.HasAttRef() && m_ItemAttachment.HasUUID() && m_ItemAttachment.HasContent()) {
+
+            // Step 1)
+            if (m_AttachmentTitle->GetValue() != _T("N/A")) {
+              m_ItemAttachment.SetTitle(std2stringx(stringT(m_AttachmentTitle->GetValue())));
+            }
+
+            time_t timestamp;
+            time(&timestamp);
+            m_ItemAttachment.SetCTime(timestamp);
+
+            // Step 2)
+            m_Item.SetAttUUID(m_ItemAttachment.GetUUID());
+            m_ItemAttachment.IncRefcount();
+
+            // Step 3)
+            m_Core.PutAtt(m_ItemAttachment);
+
+            // Step 4)
+            m_ItemAttachment.SetStatus(CItem::EntryStatus::ES_ADDED);
+            m_Item.SetStatus(CItem::EntryStatus::ES_MODIFIED);
+          }
+
+          /*
+            Case: Item has an attachment which shall be removed.
+            Steps:
+              1) Detach the attachment (CItemAtt) from the item.
+              2) Remove the attachment from the core.
+              3) Update item's status.
+          */
+          else if (m_Item.HasAttRef() && !m_ItemAttachment.HasUUID() && !m_ItemAttachment.HasContent()) {
+
+            // Step 1)
+            auto uuid = m_Item.GetAttUUID();
+            auto itemAttachment = m_Core.GetAtt(uuid);
+            m_Item.ClearAttUUID();
+            itemAttachment.DecRefcount();
+
+            // Step 2)
+            m_Core.RemoveAtt(itemAttachment.GetUUID());
+
+            // Step 3)
+            m_Item.SetStatus(CItem::EntryStatus::ES_MODIFIED);
+          }
+
+          /*
+            Case: Item has an attachment which shall be replaced by a new one.
+            Steps:
+              1) Update attachment meta data.
+              2) Detach the attachment (CItemAtt) from the item.
+              3) Remove the attachment from the Core.
+              4) Associate the new attachment with the item (CItemData).
+              5) Add new attachment (CItemAtt) to the core.
+              6) Update item's status.
+          */
+          else if (isAttachmentModified) {
+
+            // Step 1)
+            if (m_AttachmentTitle->GetValue() != _T("N/A")) {
+              m_ItemAttachment.SetTitle(std2stringx(stringT(m_AttachmentTitle->GetValue())));
+            }
+
+            time_t timestamp;
+            time(&timestamp);
+            m_ItemAttachment.SetCTime(timestamp);
+
+            // Step 2)
+            auto uuid = m_Item.GetAttUUID();
+            auto itemAttachment = m_Core.GetAtt(uuid);
+            m_Item.ClearAttUUID();
+            itemAttachment.DecRefcount();
+
+            // Step 3)
+            m_Core.RemoveAtt(itemAttachment.GetUUID());
+
+            // Step 4)
+            m_Item.SetAttUUID(m_ItemAttachment.GetUUID());
+            m_ItemAttachment.IncRefcount();
+
+            // Step 5)
+            m_Core.PutAtt(m_ItemAttachment);
+
+            // Step 6)
+            m_Item.SetStatus(CItem::EntryStatus::ES_MODIFIED);
+          }
+          else {
+            ;
+          }
+        }
+
+        if (bIsModified || bIsPSWDModified || isAttachmentModified) {
+          // All fields in m_item now reflect user's edits
+          // Let's update the core's data
+          uuid_array_t uuid;
+          m_Item.GetUUID(uuid);
+          auto listpos = m_Core.Find(uuid);
+          ASSERT(listpos != m_Core.GetEntryEndIter());
+          m_Core.Execute(EditEntryCommand::Create(&m_Core,
+                                                  m_Core.GetEntry(listpos),
+                                                  m_Item));
+        }
       }
       break;
       case SheetType::ADD: {
@@ -1627,6 +2289,44 @@ void AddEditPropSheetDlg::OnOk(wxCommandEvent& WXUNUSED(evt))
         }
         else {
           m_Item.SetXTime(m_tttExpirationTime);
+        }
+
+        /////////////////////////////////////////////////////////////////////////////
+        // Tab: "Attachment"
+        /////////////////////////////////////////////////////////////////////////////
+
+        if (m_Core.GetReadFileVersion() == PWSfile::V40) {
+
+          /*
+            Case: New item shall get an attachment.
+            Steps:
+              1) Update attachment meta data.
+              2) Associate the attachment with the item (CItemData).
+              3) Add attachment (CItemAtt) to the core.
+              4) Update item's status.
+          */
+          if (!m_Item.HasAttRef() && m_ItemAttachment.HasUUID() && m_ItemAttachment.HasContent()) {
+
+            // Step 1)
+            if (m_AttachmentTitle->GetValue() != _T("N/A")) {
+              m_ItemAttachment.SetTitle(std2stringx(stringT(m_AttachmentTitle->GetValue())));
+            }
+
+            time_t timestamp;
+            time(&timestamp);
+            m_ItemAttachment.SetCTime(timestamp);
+
+            // Step 2)
+            m_Item.SetAttUUID(m_ItemAttachment.GetUUID());
+            m_ItemAttachment.IncRefcount();
+
+            // Step 3)
+            m_Core.PutAtt(m_ItemAttachment);
+
+            // Step 4)
+            m_ItemAttachment.SetStatus(CItem::EntryStatus::ES_ADDED);
+            m_Item.SetStatus(CItem::EntryStatus::ES_MODIFIED);
+          }
         }
       }
       break;

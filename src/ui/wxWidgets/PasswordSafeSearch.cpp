@@ -151,6 +151,10 @@ void PasswordSafeSearch::OnDoSearchT(Iter begin, Iter end, Accessor afn)
     m_criteria->Clean();
     txtCtrl->SetModified(false);
     m_searchPointer.InitIndex();
+
+    // Set last find filter
+    UUIDVector res(m_searchPointer);
+    m_parentFrame->SetFilterFindEntries(&res);
   }
   else {
     ++m_searchPointer;
@@ -215,6 +219,7 @@ void PasswordSafeSearch::OnSearchClear(wxCommandEvent& WXUNUSED(event))
   txtCtrl->Clear();
   m_searchPointer.Clear();
   ClearToolbarStatusArea();
+  m_parentFrame->SetFilterFindEntries(nullptr);
 }
 
 /**
@@ -295,7 +300,8 @@ void PasswordSafeSearch::CalculateToolsWidth()
 wxSize PasswordSafeSearch::CalculateSearchWidth()
 {
   auto width = m_parentFrame->GetSize().GetWidth() < 570 ? (m_parentFrame->GetSize().GetWidth() / 3) : 200;
-  return wxSize(width, wxDefaultSize.GetHeight());
+
+  return wxSize(width, 30);
 }
 
 void PasswordSafeSearch::HideSearchToolbar()

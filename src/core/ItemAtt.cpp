@@ -115,12 +115,6 @@ void CItemAtt::SetContent(const unsigned char *content, size_t clen)
   SetField(CONTENT, content, clen);
 }
 
-time_t CItemAtt::GetCTime(time_t &t) const
-{
-  CItem::GetTime(ATTCTIME, t);
-  return t;
-}
-
 StringX CItemAtt::GetTime(int whichtime, PWSUtil::TMC result_format) const
 {
   time_t t;
@@ -175,18 +169,23 @@ int CItemAtt::Import(const stringT &fname)
     return PWScore::CANT_OPEN_FILE;
 
   auto flen = static_cast<size_t>(pws_os::fileLength(fhandle));
+  if (flen > CItemAtt::MAX_SIZE) {
+    pws_os::FClose(fhandle, false);
+    return PWScore::MAX_SIZE_EXCEEDED;
+  }
+
   auto *data = new unsigned char[flen];
   if (data == nullptr)
     return PWScore::FAILURE;
 
   size_t nread = fread(data, flen, 1, fhandle);
   if (nread != 1) {
-    fclose(fhandle);
+    pws_os::FClose(fhandle, false);
     status = PWScore::READ_FAIL;
     goto done;
   }
 
-  if (fclose(fhandle) != 0) {
+  if (pws_os::FClose(fhandle, true) != 0) {
     status = PWScore::READ_FAIL;
     goto done;
   }

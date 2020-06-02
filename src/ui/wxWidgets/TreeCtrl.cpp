@@ -283,6 +283,9 @@ void TreeCtrl::UpdateGUI(UpdateGUICommand::GUI_Action ga, const pws_os::CUUID &e
       // Handled by PasswordSafeFrame
       break;
     case UpdateGUICommand::GUI_REFRESH_ENTRY:
+      ASSERT(item != nullptr);
+      UpdateItem(*item);
+      break;
     case UpdateGUICommand::GUI_REFRESH_GROUPS:
     case UpdateGUICommand::GUI_REFRESH_BOTHVIEWS:
       // TODO: ???
@@ -354,6 +357,15 @@ bool TreeCtrl::ItemIsGroup(const wxTreeItemId& item) const
 {
   int image = GetItemImage(item);
   return image == NODE_II && GetRootItem() != item;
+}
+
+/**
+ * Provides the information whether a tree item is a group or root.
+ */
+bool TreeCtrl::ItemIsGroupOrRoot(const wxTreeItemId& item) const
+{
+  int image = GetItemImage(item);
+  return image == NODE_II || GetRootItem() == item;
 }
 
 // XXX taken from Windows TreeCtrl.cpp
@@ -612,7 +624,7 @@ int TreeCtrl::OnCompareItems(const wxTreeItemId& item1, const wxTreeItemId& item
 
 void TreeCtrl::SortChildrenRecursively(const wxTreeItemId& item)
 {
-  if (!ItemIsGroup(item) || GetChildrenCount(item) <= 0)
+  if (!ItemIsGroupOrRoot(item) || GetChildrenCount(item) <= 0)
     return;
 
   SortChildren(item);
